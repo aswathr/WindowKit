@@ -27,15 +27,11 @@ final class PassthroughWindow: UIWindow {
         guard let rootView = rootViewController?.view else {
             return hitView
         }
-        
-        defer {
-            allowNextRootHit = rootView.subviews.contains(hitView)
+
+        guard let layer = rootView.layer.hitTest(point), layer.name == nil else {
+            return nil
         }
-        
-        if rootView == hitView {
-            return allowNextRootHit ? rootView : nil
-        } else {
-            return hitView
-        }
+
+        return rootView
     }
 }

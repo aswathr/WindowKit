@@ -11,13 +11,12 @@ import UIKit
 import SwiftUI
 import OSLog
 
-@MainActor
-final class WindowManager: ObservableObject {
+@MainActor final class WindowManager: ObservableObject {
     static let shared = WindowManager()
     
     let dismissSubject: PassthroughSubject<WindowKey, Never>
     
-    private var allWindows: [WindowKey: UIWindow]
+    private var allWindows: [WindowKey: WindowValue]
     
     init() {
         self.allWindows = [:]
@@ -34,10 +33,16 @@ final class WindowManager: ObservableObject {
             Logger.main.error("[Presentation] Attempt to present a window with key '\(key)' while there is already a window with key '\(key)' presented on the current window scene.")
             return
         }
-        
+
+        guard key.windowScene.activationState != .unattached else {
+            // swiftlint:disable:next line_length
+            Logger.main.error("[Presentation] Attempt to present a window on a window scene that is unattached.")
+            return
+        }
+
         let window = UIWindow(windowScene: key.windowScene)
-        allWindows[key] = window
-        
+        allWindows[key] = WindowValue(window: window, transitioningDelegate: configuration.transitioningDelegate)
+
         let viewController = UIViewController(nibName: nil, bundle: nil)
         window.rootViewController = viewController
         window.windowLevel = configuration.level
@@ -52,9 +57,19 @@ final class WindowManager: ObservableObject {
         hostingController.modalPresentationStyle = configuration.modalPresentationStyle
         hostingController.overrideUserInterfaceStyle = configuration.userInterfaceStyle
         hostingController.isModalInPresentation = configuration.isModalInPresentation
-        
+        hostingController.transitioningDelegate = configuration.transitioningDelegate
+        #if os(iOS)
+        if #available(iOS 15.0, *) {
+            if let sheet = hostingController.sheetPresentationController {
+                sheet.apply(configuration.sheetConfiguration)
+            }
+        }
+        #endif
+
         window.makeKeyAndVisible()
-        window.subviews.forEach { $0.isHidden = true }
+        for subview in window.subviews {
+            subview.isHidden = true
+        }
         
         DispatchQueue.main.async {
             viewController.present(hostingController, animated: true)
@@ -71,10 +86,16 @@ final class WindowManager: ObservableObject {
             Logger.main.error("[Presentation] Attempt to present a window with key '\(key)' while there is already a window with key '\(key)' presented on the current window scene.")
             return
         }
-        
+
+        guard key.windowScene.activationState != .unattached else {
+            // swiftlint:disable:next line_length
+            Logger.main.error("[Presentation] Attempt to present a window on a window scene that is unattached.")
+            return
+        }
+
         let window = PassthroughWindow(windowScene: key.windowScene)
-        allWindows[key] = window
-        
+        allWindows[key] = WindowValue(window: window)
+
         let viewController = WindowOverlayHostingController(key: key) {
             view(window)
         }
@@ -95,49 +116,35 @@ final class WindowManager: ObservableObject {
     }
     
     func update(key: WindowKey) {
-        guard let window = allWindows[key] else {
+        guard let value = allWindows[key] else {
             return
         }
-        
-        guard var viewController = window.rootViewController?.findViewController(of: DynamicProperty.self) else {
+
+        guard var viewController = value.findViewController(of: DynamicProperty.self) else {
             return
         }
-        
+
         viewController.update()
     }
     
     func dismiss(with key: WindowKey) {
-        guard let window = allWindows[key] else {
+        guard let value = allWindows[key] else {
             return
         }
-        
+
         dismissSubject.send(key)
-        
-        if let rootViewController = window.rootViewController {
-            rootViewController.dismiss(animated: true) { [weak self] in
-                window.isHidden = true
-                self?.allWindows[key] = nil
-            }
-        } else {
-            window.isHidden = true
-            allWindows[key] = nil
+
+        value.dismiss { [weak self] in
+            self?.allWindows[key] = nil
         }
     }
     
     func dismiss(key: WindowKey, completion: @escaping () -> Void) {
-        guard let window = allWindows[key] else {
+        guard let value = allWindows[key] else {
             return
         }
-        
-        if let rootViewController = window.rootViewController {
-            rootViewController.dismiss(animated: true) { [weak self] in
-                window.isHidden = true
-                self?.allWindows[key] = nil
-                completion()
-            }
-        } else {
-            window.isHidden = true
-            allWindows[key] = nil
+        value.dismiss { [weak self] in
+            self?.allWindows[key] = nil
             completion()
         }
     }

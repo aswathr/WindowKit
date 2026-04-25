@@ -7,12 +7,7 @@
 
 import Foundation
 import OSLog
-import UIKit
 
 extension Logger {
-    #if swift(>=5.10) && compiler(<6.0)
-    nonisolated(unsafe) static let main = Logger(subsystem: "at.davidwalter.WindowKit", category: "WindowKit")
-    #else
     static let main = Logger(subsystem: "at.davidwalter.WindowKit", category: "WindowKit")
-    #endif
 }

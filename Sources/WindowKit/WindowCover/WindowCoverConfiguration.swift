@@ -10,7 +10,7 @@ import SwiftUI
 import UIKit
 
 /// The configuration of the window cover
-public struct WindowCoverConfiguration: Hashable, Equatable, Sendable {
+@MainActor public struct WindowCoverConfiguration: Sendable {
     // MARK: - Public
     
     /// The tint color for the window cover.
@@ -23,9 +23,33 @@ public struct WindowCoverConfiguration: Hashable, Equatable, Sendable {
     public var modalPresentationStyle: UIModalPresentationStyle = .fullScreen
     /// A Boolean value indicating whether the view controller enforces a modal behavior.
     public var isModalInPresentation: Bool = true
+    /// The delegate object that provides transition animator, interactive controller, and custom presentation controller objects.
+    public var transitioningDelegate: UIViewControllerTransitioningDelegate? = nil
     /// The preferred color scheme for this presentation.
     public var colorScheme: ColorScheme?
-    
+    private var _sheetConfiguration: Any?
+    /// The sheet configuration of the window cover
+    @available(iOS 15.0, *)
+    @available(tvOS, unavailable)
+    @available(visionOS, unavailable)
+    var sheetConfiguration: WindowCoverSheetConfiguration? {
+        get {
+            _sheetConfiguration as? WindowCoverSheetConfiguration
+        }
+        set {
+            _sheetConfiguration = newValue
+        }
+    }
+
+    @available(iOS 15.0, *)
+    @available(tvOS, unavailable)
+    @available(visionOS, unavailable)
+    public mutating func sheetPresentation(configure: (inout WindowCoverSheetConfiguration) -> Void) {
+        var configuration = sheetConfiguration ?? WindowCoverSheetConfiguration()
+        configure(&configuration)
+        sheetConfiguration = configuration
+    }
+
     // MARK: - Internal
     
     var level: UIWindow.Level = .normal

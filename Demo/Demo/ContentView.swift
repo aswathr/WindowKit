@@ -12,6 +12,7 @@ struct ContentView: View {
     @Environment(\.windowScene) private var windowScene
     
     @State private var isPresented = false
+    @State private var isCustomPresented = false
     @State private var showOverlay = false
     
     @StateObject private var overlayViewModel = OverlayViewModel()
@@ -30,7 +31,19 @@ struct ContentView: View {
                     Text("`.windowCover`")
                         .textCase(nil)
                 }
-                
+
+                Section {
+                    Button {
+                        isCustomPresented = true
+                    } label: {
+                        Text("Show Cover")
+                    }
+                    Text(isCustomPresented.description)
+                } header: {
+                    Text("`.windowCover` w/ custom transition")
+                        .textCase(nil)
+                }
+
                 Section {
                     Button {
                         overlayViewModel.isPresented.toggle()
@@ -61,7 +74,16 @@ struct ContentView: View {
             } configure: { configuration in
                 configuration.colorScheme = .dark
                 configuration.modalTransitionStyle = .flipHorizontal
-                configuration.modalPresentationStyle = .fullScreen
+                configuration.modalPresentationStyle = .formSheet
+                configuration.sheetPresentation { configuration in
+                    configuration.detents = [.medium()]
+                }
+            }
+            .windowCover(isPresented: $isCustomPresented, on: windowScene) {
+                CoverView()
+            } configure: { configuration in
+                configuration.modalPresentationStyle = .custom
+                configuration.transitioningDelegate = CustomTransition()
             }
             .windowOverlay(on: windowScene) {
                 ObservableOverlay(viewModel: overlayViewModel)
